@@ -15,7 +15,6 @@ gameScene.preload = function () {
   this.load.image("ship", "assets/player3.png");
   this.load.image("meteorite", "assets/meteorite.png");
 };
-g
 gameScene.create = function () {
   const bg = this.add.sprite(0, 0, "background");
   bg.setPosition(
