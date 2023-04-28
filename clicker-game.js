@@ -66,7 +66,7 @@ gameScene.update = function () {
   this.meteorites.getChildren().forEach((meteorite) => {
     moveMeteoriteLeft(meteorite);
   });
-  if (this.ship.y == endPoint || gameTimeLimit === 0) {
+  if (this.ship.y === endPoint || gameTimeLimit === 0) {
     displayGameOver();
   }
 };
