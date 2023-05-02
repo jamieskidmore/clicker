@@ -104,7 +104,6 @@ gameScene.create = function () {
     arrow.setScale(3);
     arrow.setInteractive();
   });
-  handleShipMovementOnClick();
 
   // Decrease score and destroy meteorite upon ship-metoerite collision
   this.physics.add.collider(
@@ -159,6 +158,7 @@ gameScene.update = function () {
     ship.destroy();
   } else {
     handleShipMovementWithKeys();
+    handleShipMovementOnClick();
   }
 
   moveSprites();
@@ -238,23 +238,50 @@ const handleShipMovementWithKeys = function () {
   }
 };
 
+/**
+ * Moves ship and changes its angle on clicking keypad
+ */
 const handleShipMovementOnClick = function () {
   const shipAngle = gameScene.ship.angle;
-  const shipSpeed = gameScene.ship.speed * 3;
+  const shipSpeed = gameScene.ship.speed;
   const shipWidth = gameScene.ship.width;
   const gameWidth = gameScene.sys.game.config.width;
-  gameScene.upArrow.on("pointerup", () => {
-    console.log("running");
+
+  const upHandler = () => {
     moveShipUp(shipSpeed);
-  });
-  gameScene.downArrow.on("pointerup", () => {
+  };
+
+  const downHandler = () => {
     moveShipDown(shipSpeed);
-  });
-  gameScene.leftArrow.on("pointerup", () => {
+  };
+
+  const leftHandler = () => {
     moveShipLeft(shipWidth, shipSpeed, shipAngle);
-  });
-  gameScene.rightArrow.on("pointerup", () => {
+  };
+
+  const rightHandler = () => {
     moveShipRight(gameWidth, shipWidth, shipSpeed, shipAngle);
+  };
+
+  gameScene.upArrow.on("pointerdown", upHandler);
+  gameScene.downArrow.on("pointerdown", downHandler);
+  gameScene.leftArrow.on("pointerdown", leftHandler);
+  gameScene.rightArrow.on("pointerdown", rightHandler);
+
+  gameScene.upArrow.on("pointerup", () => {
+    gameScene.upArrow.off("pointerdown", upHandler);
+  });
+
+  gameScene.downArrow.on("pointerup", () => {
+    gameScene.downArrow.off("pointerdown", downHandler);
+  });
+
+  gameScene.leftArrow.on("pointerup", () => {
+    gameScene.leftArrow.off("pointerdown", leftHandler);
+  });
+
+  gameScene.rightArrow.on("pointerup", () => {
+    gameScene.rightArrow.off("pointerdown", rightHandler);
   });
 };
 
