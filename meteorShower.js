@@ -156,6 +156,7 @@ gameScene.update = function () {
     displayGameOver();
     spriteGroups.push(blackHoles);
     destroyAll(spriteGroups);
+    ship.destroy();
   } else {
     handleShipMovementWithKeys();
   }
@@ -220,16 +221,14 @@ const moveSprites = function () {
  */
 const handleShipMovementWithKeys = function () {
   const shipAngle = gameScene.ship.angle;
-  const shipX = gameScene.ship.x;
-  const shipY = gameScene.ship.y;
   const shipSpeed = gameScene.ship.speed;
   const shipWidth = gameScene.ship.width;
   const gameWidth = gameScene.sys.game.config.width;
   if (cursors.right.isDown) {
-    moveShipRight(shipX, gameWidth, shipWidth, shipSpeed, shipAngle);
+    moveShipRight(gameWidth, shipWidth, shipSpeed, shipAngle);
   }
   if (cursors.left.isDown) {
-    moveShipLeft(shipX, shipWidth, shipSpeed, shipAngle);
+    moveShipLeft(shipWidth, shipSpeed, shipAngle);
   }
   if (cursors.up.isDown) {
     moveShipUp(shipSpeed);
@@ -241,9 +240,7 @@ const handleShipMovementWithKeys = function () {
 
 const handleShipMovementOnClick = function () {
   const shipAngle = gameScene.ship.angle;
-  const shipX = gameScene.ship.x;
-  const shipY = gameScene.ship.y;
-  const shipSpeed = gameScene.ship.speed;
+  const shipSpeed = gameScene.ship.speed * 3;
   const shipWidth = gameScene.ship.width;
   const gameWidth = gameScene.sys.game.config.width;
   gameScene.upArrow.on("pointerup", () => {
@@ -254,21 +251,15 @@ const handleShipMovementOnClick = function () {
     moveShipDown(shipSpeed);
   });
   gameScene.leftArrow.on("pointerup", () => {
-    moveShipLeft(shipX, shipWidth, shipSpeed, shipAngle);
+    moveShipLeft(shipWidth, shipSpeed, shipAngle);
   });
   gameScene.rightArrow.on("pointerup", () => {
-    moveShipRight(shipX, gameWidth, shipWidth, shipSpeed, shipAngle);
+    moveShipRight(gameWidth, shipWidth, shipSpeed, shipAngle);
   });
 };
 
-const moveShipRight = function (
-  shipX,
-  gameWidth,
-  shipWidth,
-  shipSpeed,
-  shipAngle
-) {
-  if (shipX < gameWidth - shipWidth / 2) {
+const moveShipRight = function (gameWidth, shipWidth, shipSpeed, shipAngle) {
+  if (gameScene.ship.x < gameWidth - shipWidth / 2) {
     gameScene.ship.x += shipSpeed;
     if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
       gameScene.ship.angle = 135;
@@ -278,8 +269,8 @@ const moveShipRight = function (
   }
 };
 
-const moveShipLeft = function (shipX, shipWidth, shipSpeed, shipAngle) {
-  if (shipX > 0 + shipWidth / 2) {
+const moveShipLeft = function (shipWidth, shipSpeed, shipAngle) {
+  if (gameScene.ship.x > 0 + shipWidth / 2) {
     gameScene.ship.x -= shipSpeed;
     if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
       gameScene.ship.angle = -135;
@@ -295,7 +286,7 @@ const moveShipUp = function (shipSpeed) {
 };
 
 const moveShipDown = function (shipSpeed) {
-  if (gameScene.ship.y < 470) {
+  if (!gameOver && gameScene.ship.y < 470) {
     gameScene.ship.y += shipSpeed;
     gameScene.ship.angle = 180;
   }
