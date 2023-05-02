@@ -1,13 +1,14 @@
 const gameScene = new Phaser.Scene("Game");
 
 const endPoint = -15;
-const scoreFactor = 10;
+const startingScore = 50;
 
 let gameOver = false;
 let timer;
 let gameTimeLimit = 15;
 let scoreText;
 let scoreDeduction = 0;
+let centerOfGravityLocation;
 
 gameScene.preload = function () {
   this.load.image("background", "assets/background.png");
@@ -16,6 +17,7 @@ gameScene.preload = function () {
   this.load.image("meteorite", "assets/meteorite.png");
   this.load.image("star", "assets/star.png");
   this.load.image("comet", "assets/comet.png");
+  this.load.image("blackHole", "assets/board.png");
 };
 
 let cursors;
@@ -29,18 +31,19 @@ gameScene.create = function () {
   );
 
   // Initialize score as 0 in the top left corner
-  scoreText = this.add.text(0, 0, "Score: 0");
+  scoreText = this.add.text(0, 0, `Score: ${startingScore}`);
 
   // Initialize game timer as 60 seconds in the top right corner
   timer = this.add.text(710, 0, `Timer: ${gameTimeLimit}`);
   timer.depth = 1;
 
-  // Create a group for all meteorites
   this.meteorites = this.physics.add.group();
 
   this.stars = this.physics.add.group();
 
   this.comets = this.physics.add.group();
+
+  this.blackHoles = this.physics.add.group({ immovable: true });
 
   this.hpDisplay = this.add.group();
 
@@ -52,29 +55,11 @@ gameScene.create = function () {
     callbackScope: this,
   });
 
-  // Add event to spawn meteorites
-  this.meteoriteSpawnerEvent = this.time.addEvent({
-    delay: 150,
-    loop: true,
-    callback: spawnMeteorite,
-    callbackScope: this,
-  });
-
-  // Add event to spawn comets
-  this.cometSpawnerEvent = this.time.addEvent({
-    delay: 700,
-    loop: true,
-    callback: spawnComet,
-    callbackScope: this,
-  });
-
-  // Add event to spawn stars
-  this.starSpawnerEvent = this.time.addEvent({
-    delay: 150,
-    loop: true,
-    callback: spawnStar,
-    callbackScope: this,
-  });
+  // Add events to spawn objects
+  this.meteoriteSpawnerEvent = createEvent(150, spawnMeteorite);
+  this.cometSpawnerEvent = createEvent(800, spawnComet);
+  this.starSpawnerEvent = createEvent(150, spawnStar);
+  this.blackHoleSpawnerEvent = createEvent(3000, spawnBlackHole);
 
   // Create the planet where the ship spawns
   this.startingPoint = this.add.sprite(400, 530, "startingPoint");
@@ -99,8 +84,8 @@ gameScene.create = function () {
     this.meteorites,
     function (ship, meteorite) {
       meteorite.destroy();
-      scoreDeduction += 5;
-      updateScore(ship.y);
+      scoreDeduction += 10;
+      updateScore();
     }
   );
 
@@ -114,38 +99,64 @@ gameScene.create = function () {
   this.physics.add.collider(this.ship, this.stars, function (ship, star) {
     star.destroy();
     scoreDeduction -= 5;
-    updateScore(ship.y);
+    updateScore();
   });
+
+  this.physics.add.collider(
+    this.ship,
+    this.blackHoles,
+    function (ship, blackHole) {
+      blackHole.fixed = true;
+      createCenterOfGravity(blackHole);
+    }
+  );
 
   // Assign cursor keys (up, down, left, right) object to cursors variable
   cursors = this.input.keyboard.createCursorKeys();
 };
 
 gameScene.update = function () {
-  console.log(this.ship.y);
-  if (
-    this.ship.y < endPoint ||
-    gameTimeLimit === 0 ||
-    gameScene.ship.hp === 0
-  ) {
+  if (this.ship.y < endPoint || gameTimeLimit === 0 || gameScene.ship.hp < 1) {
     displayGameOver();
+    destroyAll();
+  } else {
+    handleShipMovement();
   }
 
   moveObjects();
 
-  if (!gameOver) {
-    handleShipMovement();
-  } else {
-    destroyAll();
-  }
-
   const hpOnScreen = this.hpDisplay.getChildren().length;
-  console.log(hpOnScreen);
-  console.log(this.ship.hp);
   if (hpOnScreen > this.ship.hp) {
     let usedHp = this.hpDisplay.getChildren()[hpOnScreen - 1];
     usedHp.destroy();
   }
+
+  if (centerOfGravityLocation) {
+    let meteorites = this.meteorites.getChildren();
+    let comets = this.comets.getChildren();
+    let stars = this.stars.getChildren();
+    meteorites.forEach((meteorite) => {
+      moveToCenterOfGravity(meteorite, centerOfGravityLocation);
+    });
+    comets.forEach((comet) => {
+      moveToCenterOfGravity(comet, centerOfGravityLocation);
+    });
+    stars.forEach((star) => {
+      moveToCenterOfGravity(star, centerOfGravityLocation);
+    });
+    moveToCenterOfGravity(this.ship, centerOfGravityLocation);
+    this.ship.depth = -1;
+  }
+};
+
+createEvent = function (delay, callback) {
+  const event = gameScene.time.addEvent({
+    delay: delay,
+    loop: true,
+    callback: callback,
+    callbackScope: this,
+  });
+  return event;
 };
 
 moveObjects = function () {
@@ -159,6 +170,11 @@ moveObjects = function () {
 
   gameScene.stars.getChildren().forEach((star) => {
     moveRight(star);
+  });
+
+  gameScene.blackHoles.getChildren().forEach((blackHole) => {
+    console.log(blackHole.fixed);
+    if (!blackHole.fixed) moveRight(blackHole);
   });
 };
 
@@ -201,9 +217,8 @@ handleShipMovement = function () {
   }
 };
 
-updateScore = function (shipPosition) {
-  let score = Math.floor((475 - shipPosition) / scoreFactor);
-  score -= scoreDeduction;
+updateScore = function () {
+  let score = 100 - scoreDeduction;
   scoreText.setText(`Score: ${score}`);
 };
 
@@ -215,7 +230,7 @@ spawnMeteorite = function () {
       "meteorite"
     );
 
-    this.meteorites.add(meteorite);
+    gameScene.meteorites.add(meteorite);
   }
 };
 
@@ -227,7 +242,7 @@ spawnComet = function () {
       "comet"
     );
 
-    this.comets.add(comet);
+    gameScene.comets.add(comet);
   }
 };
 
@@ -235,7 +250,19 @@ spawnStar = function () {
   if (!gameOver) {
     const star = gameScene.add.sprite(0, Phaser.Math.Between(0, 600), "star");
 
-    this.stars.add(star);
+    gameScene.stars.add(star);
+  }
+};
+
+spawnBlackHole = function () {
+  if (!gameOver && !centerOfGravityLocation) {
+    const blackHole = gameScene.add.sprite(
+      0,
+      Phaser.Math.Between(0, 600),
+      "blackHole"
+    );
+    blackHole.setScale(0.2);
+    gameScene.blackHoles.add(blackHole);
   }
 };
 
@@ -248,7 +275,7 @@ moveLeft = function (object) {
 };
 
 moveLeftFast = function (object) {
-  let newX = object.x - 20;
+  let newX = object.x - 12;
   object.x = newX;
   if (object.x === 0) {
     object.destroy();
@@ -266,6 +293,27 @@ moveRight = function (object) {
 slowDownShip = function () {
   gameScene.ship.speed /= 2;
   gameScene.ship.hp -= 1;
+};
+
+createCenterOfGravity = function (blackHole) {
+  let x = blackHole.x;
+  let y = blackHole.y;
+
+  centerOfGravityLocation = { x, y };
+};
+
+moveToCenterOfGravity = function (object, centerOfGravity) {
+  if (!gameOver) {
+    const angle = Phaser.Math.Angle.Between(
+      object.x,
+      object.y,
+      centerOfGravity.x,
+      centerOfGravity.y
+    );
+    const velocity = 10;
+    object.x += velocity * Math.cos(angle);
+    object.y += velocity * Math.sin(angle);
+  }
 };
 
 displayGameOver = function () {
@@ -288,6 +336,9 @@ destroyAll = function () {
   });
   gameScene.stars.getChildren().forEach((star) => {
     star.destroy();
+  });
+  gameScene.blackHoles.getChildren().forEach((blackHole) => {
+    blackHole.destroy();
   });
 };
 
