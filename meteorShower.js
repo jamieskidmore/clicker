@@ -9,6 +9,7 @@ let gameTimeLimit = 15;
 let scoreText;
 let scoreDeduction = 0;
 let centerOfGravityLocation;
+let cursors;
 
 gameScene.preload = function () {
   this.load.image("background", "assets/background.png");
@@ -19,8 +20,6 @@ gameScene.preload = function () {
   this.load.image("comet", "assets/comet.png");
   this.load.image("blackHole", "assets/board.png");
 };
-
-let cursors;
 
 gameScene.create = function () {
   // Create background and position it in the middle of the Scene
@@ -43,7 +42,7 @@ gameScene.create = function () {
 
   this.comets = this.physics.add.group();
 
-  this.blackHoles = this.physics.add.group({ immovable: true });
+  this.blackHoles = this.physics.add.group();
 
   this.hpDisplay = this.add.group();
 
@@ -57,7 +56,7 @@ gameScene.create = function () {
 
   // Add events to spawn objects
   this.meteoriteSpawnerEvent = createEvent(150, spawnMeteorite);
-  this.cometSpawnerEvent = createEvent(800, spawnComet);
+  this.cometSpawnerEvent = createEvent(500, spawnComet);
   this.starSpawnerEvent = createEvent(150, spawnStar);
   this.blackHoleSpawnerEvent = createEvent(3000, spawnBlackHole);
 
@@ -84,7 +83,7 @@ gameScene.create = function () {
     this.meteorites,
     function (ship, meteorite) {
       meteorite.destroy();
-      scoreDeduction += 10;
+      scoreDeduction += 2;
       updateScore();
     }
   );
@@ -98,7 +97,7 @@ gameScene.create = function () {
   // Increase score upon star-ship collision
   this.physics.add.collider(this.ship, this.stars, function (ship, star) {
     star.destroy();
-    scoreDeduction -= 5;
+    scoreDeduction -= 1;
     updateScore();
   });
 
@@ -125,11 +124,7 @@ gameScene.update = function () {
 
   moveObjects();
 
-  const hpOnScreen = this.hpDisplay.getChildren().length;
-  if (hpOnScreen > this.ship.hp) {
-    let usedHp = this.hpDisplay.getChildren()[hpOnScreen - 1];
-    usedHp.destroy();
-  }
+  updateHp();
 
   if (centerOfGravityLocation) {
     let meteorites = this.meteorites.getChildren();
@@ -140,6 +135,10 @@ gameScene.update = function () {
     });
     comets.forEach((comet) => {
       moveToCenterOfGravity(comet, centerOfGravityLocation);
+      // destory the comets that are to the left of the black hole because there was a bug where they weren't being sucked in
+      if (comet.x < centerOfGravityLocation.x) {
+        comet.destroy();
+      }
     });
     stars.forEach((star) => {
       moveToCenterOfGravity(star, centerOfGravityLocation);
@@ -217,8 +216,16 @@ handleShipMovement = function () {
   }
 };
 
+updateHp = function () {
+  const hpOnScreen = gameScene.hpDisplay.getChildren().length;
+  if (hpOnScreen > gameScene.ship.hp) {
+    let usedHp = gameScene.hpDisplay.getChildren()[hpOnScreen - 1];
+    usedHp.destroy();
+  }
+};
+
 updateScore = function () {
-  let score = 100 - scoreDeduction;
+  let score = startingScore - scoreDeduction;
   scoreText.setText(`Score: ${score}`);
 };
 
@@ -235,7 +242,7 @@ spawnMeteorite = function () {
 };
 
 spawnComet = function () {
-  if (!gameOver) {
+  if (!gameOver && !centerOfGravityLocation) {
     const comet = gameScene.add.sprite(
       800,
       Phaser.Math.Between(0, 600),
@@ -275,7 +282,7 @@ moveLeft = function (object) {
 };
 
 moveLeftFast = function (object) {
-  let newX = object.x - 12;
+  let newX = object.x - 10;
   object.x = newX;
   if (object.x === 0) {
     object.destroy();
