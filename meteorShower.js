@@ -11,6 +11,7 @@ let scoreText;
 let scoreDeduction = 0;
 let centerOfGravityLocation;
 let cursors;
+let shipVelocity = { x: 0, y: 0 };
 
 gameScene.preload = function () {
   this.load.image("background", "assets/background.png");
@@ -61,7 +62,7 @@ gameScene.create = function () {
     spawn("meteorite", "meteorites", 800);
   });
   this.cometSpawnerEvent = createEvent(500, () => {
-    spawn("comet", "comets", 800);
+    spawn("comet", "comets", 1000);
   });
   this.starSpawnerEvent = createEvent(150, () => {
     spawn("star", "stars", 0);
@@ -78,7 +79,7 @@ gameScene.create = function () {
   // Create the ship that the player controls
   this.ship = this.physics.add.sprite(400, 475, "ship");
   this.ship.depth = 2;
-  this.ship.speed = 3;
+  this.ship.speed = 120;
   this.ship.hp = 4;
 
   // Create hp icons in the bottom left corner
@@ -110,6 +111,8 @@ gameScene.create = function () {
     this.ship,
     this.meteorites,
     function (ship, meteorite) {
+      // ship.setVelocityX(ship.body.velocity.x);
+      // ship.setVelocityY(ship.body.velocity.y);
       meteorite.destroy();
       scoreDeduction += 2;
       updateScore();
@@ -134,6 +137,8 @@ gameScene.create = function () {
     this.blackHoles,
     function (ship, blackHole) {
       blackHole.fixed = true;
+      blackHole.moves = false;
+      blackHole.body.enable = false;
       createCenterOfGravity(blackHole);
     }
   );
@@ -143,6 +148,7 @@ gameScene.create = function () {
 };
 
 gameScene.update = function () {
+  console.log(shipVelocity);
   const meteorites = this.meteorites.getChildren();
   const comets = this.comets.getChildren();
   const stars = this.stars.getChildren();
@@ -157,6 +163,8 @@ gameScene.update = function () {
     destroyAll(spriteGroups);
     ship.destroy();
   } else {
+    this.ship.setVelocityX(shipVelocity.x);
+    this.ship.setVelocityY(shipVelocity.y);
     handleShipMovementWithKeys();
     handleShipMovementOnClick();
   }
@@ -221,20 +229,22 @@ const moveSprites = function () {
  */
 const handleShipMovementWithKeys = function () {
   const shipAngle = gameScene.ship.angle;
-  const shipSpeed = gameScene.ship.speed;
-  const shipWidth = gameScene.ship.width;
-  const gameWidth = gameScene.sys.game.config.width;
+  const speed = gameScene.ship.speed;
   if (cursors.right.isDown) {
-    moveShipRight(gameWidth, shipWidth, shipSpeed, shipAngle);
-  }
-  if (cursors.left.isDown) {
-    moveShipLeft(shipWidth, shipSpeed, shipAngle);
-  }
-  if (cursors.up.isDown) {
-    moveShipUp(shipSpeed);
-  }
-  if (cursors.down.isDown) {
-    moveShipDown(shipSpeed);
+    moveShipRight(speed, shipAngle);
+  } else if (cursors.left.isDown) {
+    moveShipLeft(speed, shipAngle);
+  } else if (cursors.up.isDown) {
+    moveShipUp(speed);
+  } else if (cursors.down.isDown) {
+    moveShipDown(speed);
+  } else if (
+    cursors.right.isUp &&
+    cursors.left.isUp &&
+    cursors.up.isUp &&
+    !gameScene.input.activePointer.isDown
+  ) {
+    stopShip();
   }
 };
 
@@ -242,52 +252,31 @@ const handleShipMovementWithKeys = function () {
  * Moves ship and changes its angle on clicking keypad
  */
 const handleShipMovementOnClick = function () {
-  const shipAngle = gameScene.ship.angle;
-  const shipSpeed = gameScene.ship.speed;
-  const shipWidth = gameScene.ship.width;
-  const gameWidth = gameScene.sys.game.config.width;
-
-  const upHandler = () => {
-    moveShipUp(shipSpeed);
-  };
-
-  const downHandler = () => {
-    moveShipDown(shipSpeed);
-  };
-
-  const leftHandler = () => {
-    moveShipLeft(shipWidth, shipSpeed, shipAngle);
-  };
-
-  const rightHandler = () => {
-    moveShipRight(gameWidth, shipWidth, shipSpeed, shipAngle);
-  };
-
-  gameScene.upArrow.on("pointerdown", upHandler);
-  gameScene.downArrow.on("pointerdown", downHandler);
-  gameScene.leftArrow.on("pointerdown", leftHandler);
-  gameScene.rightArrow.on("pointerdown", rightHandler);
-
-  gameScene.upArrow.on("pointerup", () => {
-    gameScene.upArrow.off("pointerdown", upHandler);
-  });
-
-  gameScene.downArrow.on("pointerup", () => {
-    gameScene.downArrow.off("pointerdown", downHandler);
-  });
-
-  gameScene.leftArrow.on("pointerup", () => {
-    gameScene.leftArrow.off("pointerdown", leftHandler);
-  });
-
-  gameScene.rightArrow.on("pointerup", () => {
-    gameScene.rightArrow.off("pointerdown", rightHandler);
-  });
+  handleArrowButton(gameScene.upArrow, moveShipUp);
+  handleArrowButton(gameScene.downArrow, moveShipDown);
+  handleArrowButton(gameScene.leftArrow, moveShipLeft);
+  handleArrowButton(gameScene.rightArrow, moveShipRight);
 };
 
-const moveShipRight = function (gameWidth, shipWidth, shipSpeed, shipAngle) {
-  if (gameScene.ship.x < gameWidth - shipWidth / 2) {
-    gameScene.ship.x += shipSpeed;
+const handleArrowButton = function (arrow, moveFunction) {
+  const speed = gameScene.ship.speed;
+  const angle = gameScene.ship.angle;
+  arrow
+    .on("pointerdown", function () {
+      moveFunction(speed, angle);
+    })
+    .on("pointerup", function () {
+      stopShip();
+    });
+};
+
+const moveShipRight = function (speed, shipAngle) {
+  if (
+    gameScene.ship.x <
+    gameScene.sys.game.config.width - gameScene.ship.width / 2
+  ) {
+    // gameScene.ship.setVelocityX(speed);
+    shipVelocity.x = speed;
     if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
       gameScene.ship.angle = 135;
     } else {
@@ -296,27 +285,40 @@ const moveShipRight = function (gameWidth, shipWidth, shipSpeed, shipAngle) {
   }
 };
 
-const moveShipLeft = function (shipWidth, shipSpeed, shipAngle) {
-  if (gameScene.ship.x > 0 + shipWidth / 2) {
-    gameScene.ship.x -= shipSpeed;
-    if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
-      gameScene.ship.angle = -135;
-    } else {
-      gameScene.ship.angle = -45;
-    }
+const moveShipLeft = function (speed, shipAngle) {
+  if (gameScene.ship.x > 0 + gameScene.ship.width / 2) {
+    shipVelocity.x = -speed;
+  } else {
+    stopShip();
+  }
+  if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
+    gameScene.ship.angle = -135;
+  } else {
+    gameScene.ship.angle = -45;
   }
 };
 
-const moveShipUp = function (shipSpeed) {
-  gameScene.ship.y -= shipSpeed;
+const moveShipUp = function (speed) {
+  // gameScene.ship.setVelocityY(-speed);
+  shipVelocity.y = -speed;
   gameScene.ship.angle = 0;
 };
 
-const moveShipDown = function (shipSpeed) {
+const moveShipDown = function (speed) {
   if (!gameOver && gameScene.ship.y < 470) {
-    gameScene.ship.y += shipSpeed;
+    // gameScene.ship.setVelocityY(speed);
+    shipVelocity.y = speed;
     gameScene.ship.angle = 180;
+  } else {
+    stopShip();
   }
+};
+
+const stopShip = function () {
+  // gameScene.ship.setVelocityX(0);
+  // gameScene.ship.setVelocityY(0);
+  shipVelocity.x = 0;
+  shipVelocity.y = 0;
 };
 
 /**
@@ -383,8 +385,8 @@ const slowDownShip = function () {
  * @param {Sprite} blackHole black hole sprite that the ship collided with
  */
 const createCenterOfGravity = function (blackHole) {
-  let x = blackHole.x;
-  let y = blackHole.y;
+  const x = blackHole.x;
+  const y = blackHole.y;
 
   centerOfGravityLocation = { x, y };
 };
