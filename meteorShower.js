@@ -91,10 +91,10 @@ gameScene.create = function () {
   // Create hp icons in the bottom left corner
 
   // Create arrow pad
-  this.upArrow = this.add.sprite(755, 530, "arrow");
-  this.rightArrow = this.add.sprite(785, 560, "arrow");
-  this.leftArrow = this.add.sprite(725, 560, "arrow");
-  this.downArrow = this.add.sprite(755, 590, "arrow");
+  this.upArrow = this.add.sprite(730, 490, "arrow");
+  this.rightArrow = this.add.sprite(775, 535, "arrow");
+  this.leftArrow = this.add.sprite(685, 535, "arrow");
+  this.downArrow = this.add.sprite(730, 580, "arrow");
   this.rightArrow.angle = 90;
   this.leftArrow.angle = -90;
   this.downArrow.angle = 180;
@@ -104,7 +104,7 @@ gameScene.create = function () {
   this.arrowPad.push(this.leftArrow);
   this.arrowPad.push(this.rightArrow);
   this.arrowPad.forEach((arrow) => {
-    arrow.setScale(3);
+    arrow.setScale(5);
     arrow.setInteractive();
   });
 
