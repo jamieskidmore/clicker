@@ -2,8 +2,8 @@ const gameScene = new Phaser.Scene("Game");
 
 const endPoint = -15;
 const speed = 120;
-const startingScore = 50;
-const gameTimeLimit = 15;
+const startingScore = 0;
+const gameTimeLimit = 8;
 const gameEndDelay = 2000;
 
 let gameIsStarted;
@@ -69,7 +69,7 @@ gameScene.create = function () {
   this.cometSpawnerEvent = createEvent(this, 1200, () => {
     spawn(this, "comet", "comets", 10, 800);
   });
-  this.starSpawnerEvent = createEvent(this, 150, () => {
+  this.starSpawnerEvent = createEvent(this, 300, () => {
     spawn(this, "star", "stars", -4, 0);
   });
   this.blackHoleSpawnerEvent = createEvent(this, 3000, () => {
@@ -111,7 +111,7 @@ gameScene.create = function () {
   // Decrease score and destroy meteorite upon ship-metoerite collision
   this.physics.add.collider(this.ship, this.meteorites, (ship, meteorite) => {
     meteorite.destroy();
-    scoreDeduction += 2;
+    scoreDeduction += 1;
     updateScore(this.scoreText);
     displayTip(
       this,
@@ -239,13 +239,11 @@ const placeStartButton = function (thisScene) {
 };
 
 const initializeValues = function (thisScene, ship) {
-  console.log("initializing");
   centerOfGravityLocation = null;
   time = gameTimeLimit;
   scoreDeduction = 0;
   updateScore(thisScene.scoreText);
   shipVelocity = { x: 0, y: 0 };
-  score = startingScore;
   thisScene.ship.depth = 2;
   ship.speed = speed;
   setHp(ship, 4);
@@ -559,6 +557,7 @@ const displayGameOver = function (thisScene) {
   }
   thisScene.gameOverText.setOrigin(0.5);
   thisScene.gameOverText.setScale(2);
+  thisScene.gameOverText.depth = 2
   thisScene.gameOverText.setText("Game Over");
   setTimeout(() => {
     thisScene.gameOverText.setText("");
@@ -576,6 +575,7 @@ const displayFinalScore = function (thisScene) {
   thisScene.finalScoreText.setText(`Final score: ${score}`);
   thisScene.finalScoreText.setOrigin(0.5);
   thisScene.finalScoreText.setScale(2);
+  thisScene.finalScoreText.depth = 2
   setTimeout(() => {
     thisScene.finalScoreText.setText("");
   }, gameEndDelay);
