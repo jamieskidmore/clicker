@@ -3,7 +3,7 @@ const gameScene = new Phaser.Scene("Game");
 const endPoint = -15;
 const speed = 120;
 const startingScore = 0;
-const gameTimeLimit = 8;
+const gameTimeLimit = 20;
 const gameEndDelay = 2000;
 
 let gameIsStarted;
@@ -63,21 +63,18 @@ gameScene.create = function () {
   });
 
   // Add events to spawn objects
-  this.meteoriteSpawnerEvent = createEvent(this, 150, () => {
+  this.meteoriteSpawnerEvent = createEvent(this, 100, () => {
     spawn(this, "meteorite", "meteorites", 4, 800);
   });
   this.cometSpawnerEvent = createEvent(this, 1200, () => {
     spawn(this, "comet", "comets", 10, 800);
   });
-  this.starSpawnerEvent = createEvent(this, 300, () => {
+  this.starSpawnerEvent = createEvent(this, 150, () => {
     spawn(this, "star", "stars", -4, 0);
   });
   this.blackHoleSpawnerEvent = createEvent(this, 3000, () => {
     spawn(this, "blackHole", "blackHoles", -4, 0, 0.2);
   });
-
-  // Create start button
-  // placeStartButton();
 
   // Create the planet where the ship spawns
   this.startingPoint = this.add.sprite(400, 530, "startingPoint");
@@ -87,8 +84,6 @@ gameScene.create = function () {
   // Create the ship that the player controls
   placeShip(this);
   initializeValues(this, this.ship);
-
-  // Create hp icons in the bottom left corner
 
   // Create arrow pad
   this.upArrow = this.add.sprite(730, 490, "arrow");
@@ -111,7 +106,7 @@ gameScene.create = function () {
   // Decrease score and destroy meteorite upon ship-metoerite collision
   this.physics.add.collider(this.ship, this.meteorites, (ship, meteorite) => {
     meteorite.destroy();
-    scoreDeduction += 1;
+    scoreDeduction += 2;
     updateScore(this.scoreText);
     displayTip(
       this,
@@ -145,9 +140,9 @@ gameScene.create = function () {
   // Increase score upon star-ship collision
   this.physics.add.collider(this.ship, this.stars, (ship, star) => {
     star.destroy();
-    scoreDeduction -= 1;
+    scoreDeduction -= 2;
     updateScore(this.scoreText);
-    displayTip(this, star.x - 180, star.y, "starMessage", "+1 point from star");
+    displayTip(this, star.x - 180, star.y, "starMessage", "+2 point from star");
   });
 
   this.physics.add.collider(
@@ -557,7 +552,7 @@ const displayGameOver = function (thisScene) {
   }
   thisScene.gameOverText.setOrigin(0.5);
   thisScene.gameOverText.setScale(2);
-  thisScene.gameOverText.depth = 2
+  thisScene.gameOverText.depth = 2;
   thisScene.gameOverText.setText("Game Over");
   setTimeout(() => {
     thisScene.gameOverText.setText("");
@@ -575,7 +570,7 @@ const displayFinalScore = function (thisScene) {
   thisScene.finalScoreText.setText(`Final score: ${score}`);
   thisScene.finalScoreText.setOrigin(0.5);
   thisScene.finalScoreText.setScale(2);
-  thisScene.finalScoreText.depth = 2
+  thisScene.finalScoreText.depth = 2;
   setTimeout(() => {
     thisScene.finalScoreText.setText("");
   }, gameEndDelay);
