@@ -301,7 +301,7 @@ const createEvent = function (thisScene, delay, callback) {
  * Handles movement for all sprites
  */
 const moveOrDestroySprites = function (spriteGroups) {
-  if (spriteGroups) {
+  if (spriteGroups && !centerOfGravityLocation) {
     spriteGroups.forEach((group) => {
       group.forEach((sprite) => {
         moveSprite(sprite, sprite.moveDistance);
