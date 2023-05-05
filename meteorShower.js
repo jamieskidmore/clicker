@@ -1,17 +1,19 @@
 const gameScene = new Phaser.Scene("Game");
 
 const endPoint = -15;
+const speed = 120;
 const startingScore = 50;
+const gameTimeLimit = 15;
+const gameEndDelay = 2000;
 
-let gameOver = false;
-let timer;
-let gameTimeLimit = 15;
+let gameIsStarted;
+let gameOver;
+let time;
 let score;
-let scoreText;
-let scoreDeduction = 0;
+let scoreDeduction;
 let centerOfGravityLocation;
 let cursors;
-let shipVelocity = { x: 0, y: 0 };
+let shipVelocity;
 
 gameScene.preload = function () {
   this.load.image("background", "assets/background.png");
@@ -22,6 +24,7 @@ gameScene.preload = function () {
   this.load.image("comet", "assets/comet.png");
   this.load.image("blackHole", "assets/board.png");
   this.load.image("arrow", "assets/arrowIcon.png");
+  this.load.image("startButton", "assets/startButton.png");
 };
 
 gameScene.create = function () {
@@ -33,11 +36,11 @@ gameScene.create = function () {
   );
 
   // Initialize score as 0 in the top left corner
-  scoreText = this.add.text(0, 0, `Score: ${startingScore}`);
+  this.scoreText = this.add.text(0, 0, `Score: ${startingScore}`);
 
   // Initialize game timer as 60 seconds in the top right corner
-  timer = this.add.text(710, 0, `Timer: ${gameTimeLimit}`);
-  timer.depth = 1;
+  this.timer = this.add.text(710, 0, `Timer: ${gameTimeLimit}`);
+  this.timer.depth = 1;
 
   this.meteorites = this.physics.add.group();
 
@@ -53,23 +56,28 @@ gameScene.create = function () {
   this.timerEvent = this.time.addEvent({
     delay: 1000,
     loop: true,
-    callback: countdown,
+    callback: () => {
+      countdown(this.timer, 60); // pass the timer object and gameTimeLimit as parameters
+    },
     callbackScope: this,
   });
 
   // Add events to spawn objects
-  this.meteoriteSpawnerEvent = createEvent(150, () => {
-    spawn("meteorite", "meteorites", 800);
+  this.meteoriteSpawnerEvent = createEvent(this, 150, () => {
+    spawn(this, "meteorite", "meteorites", 4, 800);
   });
-  this.cometSpawnerEvent = createEvent(500, () => {
-    spawn("comet", "comets", 1000);
+  this.cometSpawnerEvent = createEvent(this, 1200, () => {
+    spawn(this, "comet", "comets", 10, 800);
   });
-  this.starSpawnerEvent = createEvent(150, () => {
-    spawn("star", "stars", 0);
+  this.starSpawnerEvent = createEvent(this, 150, () => {
+    spawn(this, "star", "stars", -4, 0);
   });
-  this.blackHoleSpawnerEvent = createEvent(3000, () => {
-    spawn("blackHole", "blackHoles", 0, 0.2);
+  this.blackHoleSpawnerEvent = createEvent(this, 3000, () => {
+    spawn(this, "blackHole", "blackHoles", -4, 0, 0.2);
   });
+
+  // Create start button
+  // placeStartButton();
 
   // Create the planet where the ship spawns
   this.startingPoint = this.add.sprite(400, 530, "startingPoint");
@@ -77,16 +85,10 @@ gameScene.create = function () {
   this.startingPoint.depth = 1;
 
   // Create the ship that the player controls
-  this.ship = this.physics.add.sprite(400, 475, "ship");
-  this.ship.depth = 2;
-  this.ship.speed = 120;
-  this.ship.hp = 4;
+  placeShip(this);
+  initializeValues(this, this.ship);
 
   // Create hp icons in the bottom left corner
-  for (let i = 0; i < this.ship.hp; i++) {
-    let hp = this.add.sprite(this.ship.width / 2 + i * 30, 580, "ship");
-    this.hpDisplay.add(hp);
-  }
 
   // Create arrow pad
   this.upArrow = this.add.sprite(755, 530, "arrow");
@@ -107,29 +109,45 @@ gameScene.create = function () {
   });
 
   // Decrease score and destroy meteorite upon ship-metoerite collision
-  this.physics.add.collider(
-    this.ship,
-    this.meteorites,
-    function (ship, meteorite) {
-      // ship.setVelocityX(ship.body.velocity.x);
-      // ship.setVelocityY(ship.body.velocity.y);
-      meteorite.destroy();
-      scoreDeduction += 2;
-      updateScore();
-    }
-  );
+  this.physics.add.collider(this.ship, this.meteorites, (ship, meteorite) => {
+    meteorite.destroy();
+    scoreDeduction += 2;
+    updateScore(this.scoreText);
+    displayTip(
+      this,
+      meteorite.x + 40,
+      meteorite.y,
+      "meteorMessage",
+      "-2 points from meteor"
+    );
+  });
 
   // Slow down ship upon comet-ship collision
-  this.physics.add.collider(this.ship, this.comets, function (ship, comet) {
+  this.physics.add.collider(this.ship, this.comets, (ship, comet) => {
     comet.destroy();
-    slowDownShip();
+    slowDownShip(ship);
+    displayTip(
+      this,
+      comet.x,
+      comet.y - 60,
+      "cometHPMessage",
+      "-1 HP from comet"
+    );
+    displayTip(
+      this,
+      comet.x,
+      comet.y - 30,
+      "cometSpeedMessage",
+      "Comets slow down the ship"
+    );
   });
 
   // Increase score upon star-ship collision
-  this.physics.add.collider(this.ship, this.stars, function (ship, star) {
+  this.physics.add.collider(this.ship, this.stars, (ship, star) => {
     star.destroy();
     scoreDeduction -= 1;
-    updateScore();
+    updateScore(this.scoreText);
+    displayTip(this, star.x - 180, star.y, "starMessage", "+1 point from star");
   });
 
   this.physics.add.collider(
@@ -148,52 +166,130 @@ gameScene.create = function () {
 };
 
 gameScene.update = function () {
-  console.log(shipVelocity);
-  const meteorites = this.meteorites.getChildren();
-  const comets = this.comets.getChildren();
-  const stars = this.stars.getChildren();
-  const blackHoles = this.blackHoles.getChildren();
-  const ship = this.ship;
+  this.startButton.on(
+    "pointerup",
+    () => {
+      this.startButton.destroy();
+      gameIsStarted = true;
+    },
+    this
+  );
 
-  const spriteGroups = [meteorites, comets, stars];
+  const spriteGroups = [
+    this.meteorites.getChildren(),
+    this.comets.getChildren(),
+    this.stars.getChildren(),
+    this.blackHoles.getChildren(),
+  ];
+  moveOrDestroySprites(spriteGroups);
 
-  if (this.ship.y < endPoint || gameTimeLimit === 0 || ship.hp < 1) {
-    displayGameOver();
-    spriteGroups.push(blackHoles);
-    destroyAll(spriteGroups);
-    ship.destroy();
-  } else {
-    this.ship.setVelocityX(shipVelocity.x);
-    this.ship.setVelocityY(shipVelocity.y);
-    handleShipMovementWithKeys();
-    handleShipMovementOnClick();
-  }
+  moveOrStopShip(this.ship);
 
-  moveSprites();
+  updateHp(this);
+  // this.ship.setVelocityX(shipVelocity.x);
+  // this.ship.setVelocityY(shipVelocity.y);
 
-  updateHp();
+  if (gameIsStarted) {
+    handleBlackHoleCollision(
+      this.meteorites,
+      this.comets,
+      this.stars,
+      this.blackHoles,
+      this.ship
+    );
 
-  if (centerOfGravityLocation) {
-    // Check if black hole was struck
-    // Stop comets from spawning
-    comets.forEach((comet) => comet.destroy());
-    // Stop more blackholes from spawning
-    blackHoles.forEach((blackHole) => {
-      if (blackHole.x < centerOfGravityLocation.x) {
-        blackHole.destroy();
-      }
-    });
-    handleBlackHoleCollision(ship, spriteGroups, centerOfGravityLocation);
+    if (time === 0 || this.ship.hp === 0) {
+      gameIsStarted = false;
+      displayGameOver(this);
+      displayFinalScore(this);
+      resetGame(this, this.ship);
+    } else if (this.ship.body) {
+      handleShipMovementWithKeys(this.ship, this.input.activePointer.isDown);
+      handleShipMovementOnClick(
+        this.ship,
+        this.upArrow,
+        this.downArrow,
+        this.leftArrow,
+        this.rightArrow
+      );
+    }
   }
 };
 
-/**
- * Triggers specfied callback on given time interval
- * @param {number} delay time interval
- * @param {callback} callback function that gets called
- */
-const createEvent = function (delay, callback) {
-  const event = gameScene.time.addEvent({
+const placeStartButton = function (thisScene) {
+  if (thisScene.startButton) {
+    if (!thisScene.startButton.scene) {
+      thisScene.startButton = thisScene.add
+        .sprite(
+          thisScene.sys.game.config.width / 2,
+          thisScene.sys.game.config.height / 2,
+          "startButton"
+        )
+        .setInteractive();
+    }
+  } else {
+    thisScene.startButton = thisScene.add
+      .sprite(
+        thisScene.sys.game.config.width / 2,
+        thisScene.sys.game.config.height / 2,
+        "startButton"
+      )
+      .setInteractive();
+  }
+};
+
+const initializeValues = function (thisScene, ship) {
+  console.log("initializing");
+  centerOfGravityLocation = null;
+  time = gameTimeLimit;
+  scoreDeduction = 0;
+  updateScore(thisScene.scoreText);
+  shipVelocity = { x: 0, y: 0 };
+  score = startingScore;
+  thisScene.ship.depth = 2;
+  ship.speed = speed;
+  setHp(ship, 4);
+  placeStartButton(thisScene);
+};
+
+const placeShip = function (thisScene) {
+  thisScene.ship = thisScene.physics.add.sprite(400, 475, "ship");
+  thisScene.ship.depth = 2;
+  thisScene.ship.hp = 4;
+};
+
+const resetShipPosition = function (ship) {
+  stopShip();
+  ship.angle = 0;
+  ship.x = 400;
+  ship.y = 475;
+  ship.depth = -1;
+};
+
+const setHp = function (ship, hp) {
+  const numberOfHp = hp;
+  ship.hp = numberOfHp;
+};
+
+const displayHp = function (thisScene, ship, hpDisplay, i) {
+  let hpToAdd = thisScene.add.sprite(ship.width / 2 + i * 30, 580, "ship");
+  hpDisplay.add(hpToAdd);
+};
+
+const updateHp = function (thisScene) {
+  if (thisScene.hpDisplay.getChildren()) {
+    thisScene.hpDisplay.getChildren().forEach((hpIcon) => {
+      hpIcon.destroy();
+    });
+  }
+  const shipHp = thisScene.ship.hp;
+  for (let i = 0; i < shipHp; i++) {
+    displayHp(thisScene, thisScene.ship, thisScene.hpDisplay, i);
+  }
+};
+
+const createEvent = function (thisScene, delay, callback) {
+  const event = thisScene.time.addEvent({
     delay: delay,
     loop: true,
     callback: callback,
@@ -204,45 +300,57 @@ const createEvent = function (delay, callback) {
 /**
  * Handles movement for all sprites
  */
-const moveSprites = function () {
-  gameScene.meteorites.getChildren().forEach((meteorite) => {
-    moveSprite(meteorite, 4);
-  });
+const moveOrDestroySprites = function (spriteGroups) {
+  if (spriteGroups) {
+    spriteGroups.forEach((group) => {
+      group.forEach((sprite) => {
+        moveSprite(sprite, sprite.moveDistance);
+        if (!gameIsStarted) {
+          sprite.destroy();
+        }
+      });
+    });
+  }
+};
 
-  gameScene.comets.getChildren().forEach((comet) => {
-    moveSprite(comet, 10);
-  });
-
-  gameScene.stars.getChildren().forEach((star) => {
-    moveSprite(star, -4);
-  });
-
-  gameScene.blackHoles.getChildren().forEach((blackHole) => {
-    if (!blackHole.fixed) {
-      moveSprite(blackHole, -4);
-    }
-  });
+const moveOrStopShip = function (ship) {
+  const buffer = ship.width / 2;
+  if (ship.x <= 0 + buffer) {
+    stopShip();
+    ship.x += 1;
+  } else if (ship.x >= 800 - buffer) {
+    stopShip();
+    ship.x -= 1;
+  } else if (ship.y <= 0 + buffer) {
+    stopShip();
+    ship.y += 1;
+  } else if (ship.y >= 490) {
+    stopShip();
+    ship.y -= 1;
+  }
+  ship.setVelocityX(shipVelocity.x);
+  ship.setVelocityY(shipVelocity.y);
 };
 
 /**
  * Moves ship and changes its angle on arrow key press
  */
-const handleShipMovementWithKeys = function () {
-  const shipAngle = gameScene.ship.angle;
-  const speed = gameScene.ship.speed;
+const handleShipMovementWithKeys = function (ship, mouseIsDown) {
+  const shipAngle = ship.angle;
+  const speed = ship.speed;
   if (cursors.right.isDown) {
-    moveShipRight(speed, shipAngle);
+    moveShipRight(ship, speed, shipAngle);
   } else if (cursors.left.isDown) {
-    moveShipLeft(speed, shipAngle);
+    moveShipLeft(ship, speed, shipAngle);
   } else if (cursors.up.isDown) {
-    moveShipUp(speed);
+    moveShipUp(ship, speed);
   } else if (cursors.down.isDown) {
-    moveShipDown(speed);
+    moveShipDown(ship, speed);
   } else if (
     cursors.right.isUp &&
     cursors.left.isUp &&
     cursors.up.isUp &&
-    !gameScene.input.activePointer.isDown
+    !mouseIsDown
   ) {
     stopShip();
   }
@@ -251,91 +359,66 @@ const handleShipMovementWithKeys = function () {
 /**
  * Moves ship and changes its angle on clicking keypad
  */
-const handleShipMovementOnClick = function () {
-  handleArrowButton(gameScene.upArrow, moveShipUp);
-  handleArrowButton(gameScene.downArrow, moveShipDown);
-  handleArrowButton(gameScene.leftArrow, moveShipLeft);
-  handleArrowButton(gameScene.rightArrow, moveShipRight);
+const handleShipMovementOnClick = function (
+  ship,
+  clickUp,
+  clickDown,
+  clickLeft,
+  clickRight
+) {
+  handleArrowButton(ship, clickUp, moveShipUp);
+  handleArrowButton(ship, clickDown, moveShipDown);
+  handleArrowButton(ship, clickLeft, moveShipLeft);
+  handleArrowButton(ship, clickRight, moveShipRight);
 };
 
-const handleArrowButton = function (arrow, moveFunction) {
-  const speed = gameScene.ship.speed;
-  const angle = gameScene.ship.angle;
+const handleArrowButton = function (ship, arrow, moveFunction) {
   arrow
     .on("pointerdown", function () {
-      moveFunction(speed, angle);
+      moveFunction(ship, ship.speed, ship.angle);
     })
     .on("pointerup", function () {
       stopShip();
     });
 };
 
-const moveShipRight = function (speed, shipAngle) {
-  if (
-    gameScene.ship.x <
-    gameScene.sys.game.config.width - gameScene.ship.width / 2
-  ) {
-    // gameScene.ship.setVelocityX(speed);
-    shipVelocity.x = speed;
-    if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
-      gameScene.ship.angle = 135;
-    } else {
-      gameScene.ship.angle = 45;
-    }
-  }
-};
-
-const moveShipLeft = function (speed, shipAngle) {
-  if (gameScene.ship.x > 0 + gameScene.ship.width / 2) {
-    shipVelocity.x = -speed;
-  } else {
-    stopShip();
-  }
+const moveShipRight = function (ship, speed, shipAngle) {
+  shipVelocity.x = speed;
   if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
-    gameScene.ship.angle = -135;
+    ship.angle = 135;
   } else {
-    gameScene.ship.angle = -45;
+    ship.angle = 45;
   }
 };
 
-const moveShipUp = function (speed) {
-  // gameScene.ship.setVelocityY(-speed);
+const moveShipLeft = function (ship, speed, shipAngle) {
+  shipVelocity.x = -speed;
+  if (shipAngle === 180 || shipAngle === -135 || shipAngle === 135) {
+    ship.angle = -135;
+  } else {
+    ship.angle = -45;
+  }
+};
+
+const moveShipUp = function (ship, speed) {
   shipVelocity.y = -speed;
-  gameScene.ship.angle = 0;
+  ship.angle = 0;
 };
 
-const moveShipDown = function (speed) {
-  if (!gameOver && gameScene.ship.y < 470) {
-    // gameScene.ship.setVelocityY(speed);
-    shipVelocity.y = speed;
-    gameScene.ship.angle = 180;
-  } else {
-    stopShip();
-  }
+const moveShipDown = function (ship, speed) {
+  shipVelocity.y = speed;
+  ship.angle = 180;
 };
 
 const stopShip = function () {
-  // gameScene.ship.setVelocityX(0);
-  // gameScene.ship.setVelocityY(0);
   shipVelocity.x = 0;
   shipVelocity.y = 0;
 };
 
 /**
- * Updates bottom-left HP icons when HP decreases
- */
-const updateHp = function () {
-  const hpOnScreen = gameScene.hpDisplay.getChildren().length;
-  if (hpOnScreen > gameScene.ship.hp) {
-    let usedHp = gameScene.hpDisplay.getChildren()[hpOnScreen - 1];
-    usedHp.destroy();
-  }
-};
-
-/**
  * Calculates score and updates text
  */
-const updateScore = function () {
+const updateScore = function (scoreText) {
   score = startingScore - scoreDeduction;
   scoreText.setText(`Score: ${score}`);
 };
@@ -347,16 +430,26 @@ const updateScore = function () {
  * @param {number} startX x coordinate where sprite spawns
  * @param {number} scale optional multiplier for sprite size
  */
-const spawn = function (spriteName, group, startX, scale) {
-  const sprite = gameScene.add.sprite(
-    startX,
-    Phaser.Math.Between(0, 600),
-    `${spriteName}`
-  );
-  if (scale) {
-    sprite.setScale(scale);
+const spawn = function (
+  thisScene,
+  spriteName,
+  group,
+  moveDistance,
+  startX,
+  scale
+) {
+  if (gameIsStarted) {
+    const sprite = thisScene.add.sprite(
+      startX,
+      Phaser.Math.Between(0, 600),
+      `${spriteName}`
+    );
+    sprite.moveDistance = moveDistance;
+    thisScene[group].add(sprite);
+    if (scale) {
+      sprite.setScale(scale);
+    }
   }
-  gameScene[group].add(sprite);
 };
 
 /**
@@ -364,8 +457,8 @@ const spawn = function (spriteName, group, startX, scale) {
  * @param {Sprite} sprite Phaser Sprite class
  * @param {number} distance Number of pixels to move (pos. value for left, neg. value for right)
  */
-const moveSprite = function (sprite, distance) {
-  let newX = sprite.x - distance;
+const moveSprite = function (sprite, moveDistance) {
+  let newX = sprite.x - moveDistance;
   sprite.x = newX;
   if (sprite.x === 0) {
     sprite.destroy();
@@ -375,9 +468,9 @@ const moveSprite = function (sprite, distance) {
 /**
  * Halves ship speed and reduces HP by 1
  */
-const slowDownShip = function () {
-  gameScene.ship.speed /= 2;
-  gameScene.ship.hp -= 1;
+const slowDownShip = function (ship) {
+  ship.speed /= 2;
+  ship.hp -= 1;
 };
 
 /**
@@ -391,25 +484,38 @@ const createCenterOfGravity = function (blackHole) {
   centerOfGravityLocation = { x, y };
 };
 
-/**
- * Calls the pullToCenter function on each sprite on the screen
- * @param {Sprite} ship ship sprite
- * @param {Group[]} spriteGroups array of all groups of sprites
- * @param {{x: number, y: number}} centerOfGravity xy coordinates that sprites are pulled towards
- */
 const handleBlackHoleCollision = function (
-  ship,
-  spriteGroups,
-  centerOfGravity
+  meteorites,
+  comets,
+  stars,
+  blackHoles,
+  ship
 ) {
-  if (!gameOver) {
-    ship.depth = -1;
-    pullToCenter(ship, centerOfGravity);
-    spriteGroups.forEach((group) => {
-      group.forEach((sprite) => {
-        pullToCenter(sprite, centerOfGravity);
-      });
+  if (centerOfGravityLocation) {
+    // Check if black hole was struck
+    // Stop comets from spawning
+    comets.getChildren().forEach((comet) => comet.destroy());
+
+    // Stop more blackholes from spawning
+    blackHoles.getChildren().forEach((blackHole) => {
+      if (blackHole.x !== centerOfGravityLocation.x) {
+        blackHole.destroy();
+      }
     });
+    const spriteGroups = [
+      meteorites.getChildren(),
+      comets.getChildren(),
+      stars.getChildren(),
+    ];
+    if (gameIsStarted) {
+      ship.depth = -1;
+      pullToCenter(ship, centerOfGravityLocation);
+      spriteGroups.forEach((group) => {
+        group.forEach((sprite) => {
+          pullToCenter(sprite, centerOfGravityLocation);
+        });
+      });
+    }
   }
 };
 
@@ -430,40 +536,66 @@ const pullToCenter = function (sprite, centerOfGravity) {
   sprite.y += velocity * Math.sin(angle);
 };
 
-/**
- * Displays game over text on the screen
- */
-const displayGameOver = function () {
-  gameOver = true;
-  const gameOverText = gameScene.add.text(
-    gameScene.sys.game.config.width / 2,
-    gameScene.sys.game.config.height / 2,
-    "Game Over"
-  );
-  gameOverText.setOrigin(0.5);
-  gameOverText.setScale(2);
+const displayTip = function (thisScene, x, y, messageName, messageContent) {
+  if (!thisScene[`${messageName}`]) {
+    thisScene[`${messageName}`] = thisScene.add.text(x, y, messageContent);
+  }
+  thisScene[`${messageName}`].depth = 2;
+  setTimeout(() => {
+    thisScene[`${messageName}`].setText("");
+  }, 4000);
 };
 
 /**
- * Destroys every sprite in each group
- * @param {Group[]} groups
+ * Displays game over text on the screen
  */
-const destroyAll = function (groups) {
-  groups.forEach((group) => {
-    group.forEach((sprite) => {
-      sprite.destroy();
-    });
-  });
+const displayGameOver = function (thisScene) {
+  if (!thisScene.gameOverText) {
+    thisScene.gameOverText = thisScene.add.text(
+      thisScene.sys.game.config.width / 2,
+      thisScene.sys.game.config.height / 2,
+      "Game Over"
+    );
+  }
+  thisScene.gameOverText.setOrigin(0.5);
+  thisScene.gameOverText.setScale(2);
+  thisScene.gameOverText.setText("Game Over");
+  setTimeout(() => {
+    thisScene.gameOverText.setText("");
+  }, gameEndDelay);
+};
+
+const displayFinalScore = function (thisScene) {
+  if (!thisScene.finalScoreText) {
+    thisScene.finalScoreText = thisScene.add.text(
+      thisScene.sys.game.config.width / 2,
+      thisScene.sys.game.config.height / 2 + 30,
+      `Final score: ${score}`
+    );
+  }
+  thisScene.finalScoreText.setText(`Final score: ${score}`);
+  thisScene.finalScoreText.setOrigin(0.5);
+  thisScene.finalScoreText.setScale(2);
+  setTimeout(() => {
+    thisScene.finalScoreText.setText("");
+  }, gameEndDelay);
 };
 
 /**
  * Decreases the timer by 1 every second
  */
-const countdown = function () {
-  if (gameTimeLimit > 0) {
-    gameTimeLimit--;
+const countdown = function (timer) {
+  if (gameIsStarted && time > 0) {
+    time--;
   }
-  timer.setText(`Timer: ${gameTimeLimit}`);
+  timer.setText(`Timer: ${time}`);
+};
+
+const resetGame = function (thisScene, ship) {
+  resetShipPosition(ship);
+  setTimeout(() => {
+    initializeValues(thisScene, ship);
+  }, gameEndDelay);
 };
 
 const config = {
