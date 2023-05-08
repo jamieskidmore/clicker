@@ -1,7 +1,7 @@
 const gameScene = new Phaser.Scene("Game");
 
 const endPoint = -15;
-const speed = 120;
+const speed = 240;
 const startingScore = 0;
 const gameTimeLimit = 20;
 const gameEndDelay = 2000;
@@ -57,20 +57,22 @@ gameScene.create = function () {
     delay: 1000,
     loop: true,
     callback: () => {
-      countdown(this.timer, 60); // pass the timer object and gameTimeLimit as parameters
+      countdown(this.timer); // pass the timer object and gameTimeLimit as parameters
     },
     callbackScope: this,
   });
 
   // Add events to spawn objects
-  this.meteoriteSpawnerEvent = createEvent(this, 100, () => {
-    spawn(this, "meteorite", "meteorites", 4, 800);
+  this.meteoriteSpawnerEvent = createEvent(this, 170, () => {
+    const randomSpeed = Phaser.Math.Between(2, 6);
+    spawn(this, "meteorite", "meteorites", randomSpeed, 800);
   });
   this.cometSpawnerEvent = createEvent(this, 1200, () => {
     spawn(this, "comet", "comets", 10, 800);
   });
-  this.starSpawnerEvent = createEvent(this, 150, () => {
-    spawn(this, "star", "stars", -4, 0);
+  this.starSpawnerEvent = createEvent(this, 170, () => {
+    const randomSpeed = Phaser.Math.Between(-2, -6);
+    spawn(this, "star", "stars", randomSpeed, 0);
   });
   this.blackHoleSpawnerEvent = createEvent(this, 3000, () => {
     spawn(this, "blackHole", "blackHoles", -4, 0, 0.2);
@@ -121,6 +123,9 @@ gameScene.create = function () {
   this.physics.add.collider(this.ship, this.comets, (ship, comet) => {
     comet.destroy();
     slowDownShip(ship);
+    setTimeout(() => {
+      ship.speed = speed;
+    }, 3000);
     displayTip(
       this,
       comet.x,
@@ -396,6 +401,7 @@ const moveShipLeft = function (ship, speed, shipAngle) {
 const moveShipUp = function (ship, speed) {
   shipVelocity.y = -speed;
   ship.angle = 0;
+  60;
 };
 
 const moveShipDown = function (ship, speed) {
