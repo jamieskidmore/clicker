@@ -339,14 +339,11 @@ gameScene.create = function () {
 };
 
 gameScene.onSunClick = function () {
-  // window.location.href =
-  //   "https://jamieskidmore.github.io/meteorShowerMinigame/";
-  this.scene.start("MeteorShowerScene");
+  window.location.href = "https://jamieskidmore.github.io/clicker/";
 };
 
 gameScene.onEarthClick = function () {
-  // window.location.href = "http://hypfgqkmxo.us16.qoddiapp.com/";
-  this.scene.start("WordScene");
+  window.location.href = "http://hypfgqkmxo.us16.qoddiapp.com/";
 };
 
 gameScene.onJupiterClick = function () {
@@ -354,21 +351,14 @@ gameScene.onJupiterClick = function () {
 };
 
 gameScene.onNeptuneClick = function () {
-  // window.location.href = "https://qubeqode.github.io/phaserMemoryGame/";
-  this.scene.start("MemoryGameScene");
+  window.location.href = "https://qubeqode.github.io/phaserMemoryGame/";
 };
 
 const config = {
   type: Phaser.AUTO,
   width: 800,
   height: 600,
-  scene: [
-    gameScene,
-    TriviaScene,
-    MeteorShowerScene,
-    WordScene,
-    MemoryGameScene,
-  ],
+  scene: [gameScene, TriviaScene, MeteorShowerScene],
   pixelArt: true,
   physics: {
     default: "arcade",
