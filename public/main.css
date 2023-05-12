@@ -1,0 +1,12 @@
+body {
+  font-family: "Bruno Ace SC", cursive;
+}
+
+canvas {
+  width: 75%;
+}
+
+#offscreen-input {
+  position: fixed;
+  left: -1000px;
+}
